@@ -13,8 +13,8 @@ import (
 const ruleALl = "all"
 
 type Rule struct {
-	Allow    bool
-	Args     []string
+	Allow    bool     `json:"allow"`
+	Args     []string `json:"args"`
 	ips      map[string]struct{}
 	networks []*net.IPNet
 	mutex    sync.RWMutex
