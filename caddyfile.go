@@ -14,6 +14,7 @@ import (
 func init() {
 	caddy.RegisterModule(&IPFilter{})
 	httpcaddyfile.RegisterHandlerDirective("ip_filter", parseCaddyfile)
+	httpcaddyfile.RegisterDirectiveOrder("ip_filter", httpcaddyfile.Before, "basic_auth")
 }
 
 // CaddyModule Return information of Caddy module
