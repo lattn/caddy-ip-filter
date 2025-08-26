@@ -27,40 +27,34 @@ The IP list file should contain one IP address, CIDR range, or Subnet mask per l
 
 ```caddyfile
 :80 {
-    route {
-        ip_filter {
-            # Deny IPs from a local file
-            deny file:///var/block_ips.txt
+    ip_filter {
+        # Deny IPs from a local file
+        deny file:///var/block_ips.txt
 
-            # Deny IPs from a URL
-            deny https://example.com/block_ips.txt
+        # Deny IPs from a URL
+        deny https://example.com/block_ips.txt
 
-            # Allow IPs from Cloudflare
-            allow cloudflare
+        # Allow IPs from Cloudflare
+        allow cloudflare
 
-            # Allow a single IP
-            allow 1.2.3.4
+        # Allow a single IP
+        allow 1.2.3.4
 
-            # Allow all IPs (if you want to use this as a logging tool)
-            allow all
-            
-            # Set the update interval for the IP lists
-            interval 1h
-            
-            # Set the timeout for fetching remote IP lists
-            timeout 10s
-            
-            # Trust the X-Forwarded-For and X-Real-IP headers
-            trust_x_forwarded_for
-            trust_x_real_ip
-        }
-
-        reverse_proxy localhost:8080
+        # Allow all IPs (if you want to use this as a logging tool)
+        allow all
+        
+        # Set the update interval for the IP lists
+        interval 1h
+        
+        # Set the timeout for fetching remote IP lists
+        timeout 10s
+        
+        # Trust the X-Forwarded-For and X-Real-IP headers
+        trust_x_forwarded_for
+        trust_x_real_ip
     }
 
-    log {
-        output file /var/log/caddy/test.log
-    }
+    reverse_proxy localhost:8080
 }
 ```
 
