@@ -8,6 +8,8 @@ import (
 	"os"
 	"strings"
 	"sync"
+
+	"go.uber.org/zap"
 )
 
 const ruleALl = "all"
@@ -18,6 +20,7 @@ type Rule struct {
 	ips      map[string]struct{}
 	networks []*net.IPNet
 	mutex    sync.RWMutex
+	logger   *zap.Logger
 }
 
 func NewRule(allow bool, args ...string) *Rule {
@@ -27,6 +30,10 @@ func NewRule(allow bool, args ...string) *Rule {
 		ips:      make(map[string]struct{}),
 		networks: make([]*net.IPNet, 0),
 	}
+}
+
+func (r *Rule) setLogger(logger *zap.Logger) {
+	r.logger = logger.With(zap.Bool("allow", r.Allow), zap.Strings("args", r.Args))
 }
 
 func (r *Rule) Match(ip net.IP) bool {
@@ -44,8 +51,11 @@ func (r *Rule) Match(ip net.IP) bool {
 }
 
 func (r *Rule) Fetch(ctx context.Context) error {
+	r.logger.Debug("fetch list: start")
+
 	newIPs := make(map[string]struct{})
 	var newNetworks []*net.IPNet
+	var newNetworkStrs []string
 
 	for _, arg := range r.Args {
 		ips, networks, err := loadIPList(ctx, arg)
@@ -56,7 +66,12 @@ func (r *Rule) Fetch(ctx context.Context) error {
 			newIPs[ip] = struct{}{}
 		}
 		newNetworks = append(newNetworks, networks...)
+		for _, network := range networks {
+			newNetworkStrs = append(newNetworkStrs, network.String())
+		}
 	}
+
+	r.logger.Debug("fetch list: finish", zap.Any("ips", newIPs), zap.Any("networks", newNetworkStrs))
 
 	r.mutex.Lock()
 	r.ips = newIPs

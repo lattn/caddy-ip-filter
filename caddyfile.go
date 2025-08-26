@@ -7,6 +7,7 @@ import (
 	caddy "github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
+	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	"go.uber.org/zap"
 )
 
@@ -29,6 +30,10 @@ func (*IPFilter) CaddyModule() caddy.ModuleInfo {
 func (filter *IPFilter) Provision(ctx caddy.Context) error {
 	filter.ctx = ctx
 	filter.logger = ctx.Logger(filter)
+
+	for _, rule := range filter.Rules {
+		rule.setLogger(filter.logger)
+	}
 
 	if filter.Interval == 0 {
 		filter.Interval = caddy.Duration(time.Hour)
@@ -105,3 +110,16 @@ func (filter *IPFilter) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 	}
 	return nil
 }
+
+func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error) {
+	var filter IPFilter
+	err := filter.UnmarshalCaddyfile(h.Dispenser)
+	return &filter, err
+}
+
+var (
+	_ caddy.Provisioner           = (*IPFilter)(nil)
+	_ caddy.Validator             = (*IPFilter)(nil)
+	_ caddyhttp.MiddlewareHandler = (*IPFilter)(nil)
+	_ caddyfile.Unmarshaler       = (*IPFilter)(nil)
+)

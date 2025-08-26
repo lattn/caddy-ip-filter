@@ -8,8 +8,6 @@ import (
 	"time"
 
 	caddy "github.com/caddyserver/caddy/v2"
-	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
-	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	"go.uber.org/zap"
 )
@@ -97,16 +95,3 @@ func (filter *IPFilter) getRealIP(r *http.Request) string {
 	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
 	return ip
 }
-
-func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error) {
-	var filter IPFilter
-	err := filter.UnmarshalCaddyfile(h.Dispenser)
-	return &filter, err
-}
-
-var (
-	_ caddy.Provisioner           = (*IPFilter)(nil)
-	_ caddy.Validator             = (*IPFilter)(nil)
-	_ caddyhttp.MiddlewareHandler = (*IPFilter)(nil)
-	_ caddyfile.Unmarshaler       = (*IPFilter)(nil)
-)
