@@ -2,9 +2,11 @@ package caddyipfilter
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"strings"
 	"sync"
@@ -15,12 +17,15 @@ import (
 const ruleALl = "all"
 
 type Rule struct {
-	Allow    bool     `json:"allow"`
-	Args     []string `json:"args"`
-	ips      map[string]struct{}
-	networks []*net.IPNet
-	mutex    sync.RWMutex
-	logger   *zap.Logger
+	Allow       bool     `json:"allow"`
+	Args        []string `json:"args"`
+	ips         map[string]struct{}
+	networks    []*net.IPNet
+	prefixes    map[netip.Prefix]struct{}
+	prefixBits4 []int
+	prefixBits6 []int
+	mutex       sync.RWMutex
+	logger      *zap.Logger
 }
 
 func NewRule(allow bool, args ...string) *Rule {
@@ -41,6 +46,23 @@ func (r *Rule) Match(ip net.IP) bool {
 	defer r.mutex.RUnlock()
 	if _, found := r.ips[ip.String()]; found {
 		return true
+	}
+	if r.prefixes != nil {
+		addr, ok := netip.AddrFromSlice(ip)
+		if !ok {
+			return false
+		}
+		addr = addr.Unmap()
+		bits := r.prefixBits6
+		if addr.Is4() {
+			bits = r.prefixBits4
+		}
+		for _, n := range bits {
+			if _, found := r.prefixes[netip.PrefixFrom(addr, n).Masked()]; found {
+				return true
+			}
+		}
+		return false
 	}
 	for _, network := range r.networks {
 		if network.Contains(ip) {
@@ -73,9 +95,32 @@ func (r *Rule) Fetch(ctx context.Context) error {
 
 	r.logger.Debug("fetch list: finish", zap.Any("ips", newIPs), zap.Any("networks", newNetworkStrs))
 
+	prefixes := make(map[netip.Prefix]struct{}, len(newNetworks))
+	bits4, bits6 := map[int]bool{}, map[int]bool{}
+	for _, network := range newNetworks {
+		prefix, err := netip.ParsePrefix(network.String())
+		if err != nil {
+			return err
+		}
+		prefix = prefix.Masked()
+		prefixes[prefix] = struct{}{}
+		if prefix.Addr().Is4() {
+			bits4[prefix.Bits()] = true
+		} else {
+			bits6[prefix.Bits()] = true
+		}
+	}
+	var prefixBits4, prefixBits6 []int
+	for n := range bits4 {
+		prefixBits4 = append(prefixBits4, n)
+	}
+	for n := range bits6 {
+		prefixBits6 = append(prefixBits6, n)
+	}
 	r.mutex.Lock()
 	r.ips = newIPs
 	r.networks = newNetworks
+	r.prefixes, r.prefixBits4, r.prefixBits6 = prefixes, prefixBits4, prefixBits6
 	r.mutex.Unlock()
 	return nil
 }
@@ -96,6 +141,12 @@ func loadIPList(ctx context.Context, arg string) (map[string]struct{}, []*net.IP
 		content = string(data)
 	} else if arg == cloudflareKey {
 		data, err := fetchIPListFromCloudflare(ctx)
+		if err != nil {
+			return nil, nil, err
+		}
+		content = data
+	} else if arg == "github" || strings.HasPrefix(arg, "github:") {
+		data, err := fetchGitHubIPList(ctx, githubAPI, arg)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -122,6 +173,9 @@ func fetch(ctx context.Context, url string) ([]byte, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("fetch IP list: HTTP %s", resp.Status)
+	}
 
 	return io.ReadAll(resp.Body)
 }
