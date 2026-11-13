@@ -37,6 +37,9 @@ The IP list file should contain one IP address, CIDR range, or Subnet mask per l
         # Allow IPs from Cloudflare
         allow cloudflare
 
+        # Allow GitHub webhook delivery IPs (or use github for all categories)
+        allow github:hooks
+
         # Allow a single IP
         allow 1.2.3.4
 
@@ -70,3 +73,9 @@ The IP list file should contain one IP address, CIDR range, or Subnet mask per l
 | `trust_x_real_ip`     | Trust the `X-Real-IP` header to identify the client's IP address. By default, this is disabled.            | `bool`   | `false`    |
 
 **Note**: If neither `trust_x_forwarded_for` nor `trust_x_real_ip` is enabled, the module will use the remote address of the connection to identify the client's IP address.
+
+## GitHub IP lists
+
+`github` combines the IP ranges from the GitHub metadata API. Use `github:<category>` to select one category: `hooks`, `web`, `shared_ingress`, `api`, `git`, `github_enterprise_importer`, `packages`, `pages`, `importer`, `actions`, `actions_macos`, `codespaces`, or `copilot`. These sources are refreshed at the configured interval. New categories require a module update.
+
+GitHub's Actions ranges are large and include shared cloud infrastructure; matching an address does not authenticate a GitHub workflow. For webhooks, validate the webhook signature as well as restricting the source IP. As with all rules, the first matching rule determines the outcome; unmatched requests are allowed, so an allowlist also needs a subsequent `deny all`.

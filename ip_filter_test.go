@@ -235,6 +235,7 @@ func TestRule_Fetch(t *testing.T) {
 	defer server.Close()
 
 	rule := NewRule(true, "file://"+dummyFile, server.URL, "5.5.5.5", "6.6.6.0/24")
+	rule.setLogger(zap.NewNop())
 	err = rule.Fetch(context.Background())
 	if err != nil {
 		t.Fatalf("error fetching rule: %v", err)
